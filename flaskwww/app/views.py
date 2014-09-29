@@ -12,9 +12,17 @@ def index():
 	# Renders index.html.
 	return render_template('index.html')
 
-@app.route('/history')
-def history():
-	return render_template('history.html')
+@app.route('/history_blocks')
+def history_blocks():
+	return render_template('history_blocks.html')
+
+@app.route('/history_transactions')
+def history_transactions():
+	return render_template('history_transactions.html')
+
+@app.route('/history_prices')
+def history_prices():
+	return render_template('history_prices.html')
 
 
 @app.route('/live')
@@ -56,13 +64,9 @@ def api(api_id, value = None):
 
 	elif api_id == 'gethistory':
 		hbase_blocks_table = hbase.table('block_data')
-		start = request.args.get("start")
-		end = request.args.get("end")
-		if start == None:
-			start = "0000000000"
-		if end == None:
-			end = "9999999999"
-		callback = request.args.get("callback")
+		start = request.args.get("start") if request.args.get("start") != None else "0"
+		end = request.args.get("end") if request.args.get("end") != None else "999999999999"
+		callback = request.args.get("callback") if request.args.get("callback") != None else ""
 		granularity = calculate_granularity(start, end)
 		data = hbase_blocks_table.scan(row_start="blockcount_" + granularity + "_" + start.rjust(10, '0'), 
 								row_stop="blockcount_" + granularity + "_" + end.rjust(10, '0'))
@@ -75,13 +79,9 @@ def api(api_id, value = None):
 
 	elif api_id == 'gettransactionhistory':
 		hbase_blocks_table = hbase.table('block_transactions')
-		start = request.args.get("start")
-		end = request.args.get("end")
-		if start == None:
-			start = "0000000000"
-		if end == None:
-			end = "9999999999"
-		callback = request.args.get("callback")
+		start = request.args.get("start") if request.args.get("start") != None else "0"
+		end = request.args.get("end") if request.args.get("end") != None else "999999999999"
+		callback = request.args.get("callback") if request.args.get("callback") != None else ""
 		granularity = calculate_granularity(start, end)
 		data = hbase_blocks_table.scan(row_start="transactioncount_" + granularity + "_" + start.rjust(10, '0'), 
 								row_stop="transactioncount_" + granularity + "_" + end.rjust(10, '0'))
@@ -90,16 +90,46 @@ def api(api_id, value = None):
 			results.append([ int(val[0].rsplit("_")[2])*1000, int(val[1]["metadata:count"])])
 		return callback + "(" + str(results) + ");"
 
+	elif api_id == 'getpricehistory':
+		hbase_blocks_table = hbase.table('exchange_transactions')
+		currency = request.args.get("currency")
+		currency = currency if currency != None else "ALL"
+		start = request.args.get("start") if request.args.get("start") != None else "0"
+		end = request.args.get("end") if request.args.get("end") != None else "999999999999"
+		callback = request.args.get("callback") if request.args.get("callback") != None else ""
+		granularity = calculate_granularity(start, end)
+		if currency == "ALL":
+			data = {}
+			data["USD"] = hbase_blocks_table.scan(row_start="BTC_USD_" + granularity + "_" + start.rjust(10, '0'), 
+								row_stop="BTC_USD_" + granularity + "_" + end.rjust(10, '0'))
+			data["EUR"] = hbase_blocks_table.scan(row_start="BTC_EUR_" + granularity + "_" + start.rjust(10, '0'), 
+								row_stop="BTC_EUR_" + granularity + "_" + end.rjust(10, '0'))
+			data["RUR"] = hbase_blocks_table.scan(row_start="BTC_RUR_" + granularity + "_" + start.rjust(10, '0'), 
+								row_stop="BTC_RUR_" + granularity + "_" + end.rjust(10, '0'))
+			results = { "USD":[], "EUR":[], "RUR":[] }
+			for val in data["USD"]:
+				results["USD"].append([ int(val[0].rsplit("_")[3])*1000, float(val[1]["metadata:price"])])
+			for val in data["EUR"]:
+				results["EUR"].append([ int(val[0].rsplit("_")[3])*1000, float(val[1]["metadata:price"])])
+			for val in data["RUR"]:
+				results["RUR"].append([ int(val[0].rsplit("_")[3])*1000, float(val[1]["metadata:price"])])
+		else:
+			data = hbase_blocks_table.scan(row_start="BTC_" + currency + "_" + granularity + "_" + start.rjust(10, '0'), 
+								row_stop="BTC_" + currency + "_" + granularity + "_" + end.rjust(10, '0'))
+			results = []
+			for val in data:
+				results.append([ int(val[0].rsplit("_")[3])*1000, float(val[1]["metadata:price"])])
+		return callback + "(" + str(results) + ");"
+
 
 
 	#wallets.html
 	elif api_id == 'getwalletbuckets':
 		hbase_wallets_table = hbase.table('wallet_classes')
 		drilldown_level = int(request.args.get("drilldown_level"))
-		start = request.args.get("start")
-		end = request.args.get("end")
-		start = start if start != None else "0"
-		end = end if end != None else "999999999999"
+		start = request.args.get("start") if request.args.get("start") != None else "0"
+		end = request.args.get("end") if request.args.get("end") != None else "999999999999"
+		callback = request.args.get("callback") if request.args.get("callback") != None else ""
 		data = hbase_wallets_table.scan(row_start="wallet_" + str(drilldown_level) + "_" + start.rjust(12, '0'), 
 								row_stop="wallet_" + str(drilldown_level) + "_" + end.rjust(12, '0'))
 		results = {}
@@ -110,7 +140,7 @@ def api(api_id, value = None):
 					'align': 'right', 'x': 4, 'y': 10, 'rotation': -90,
 					'style': { 'fontSize': '13px', 'fontFamily': 'Verdana, sans-serif', 'font-decoration': 'none'} }
 		else :
-			results["dataLabels"] = { 'enabled': True, 'color': '#FF0000', 
+			results["dataLabels"] = { 'enabled': True, 'color': '#FFFFFF', 
 					'align': 'center', 'y': 29,
 					'style': { 'fontSize': '18px', 'fontFamily': 'Verdana, sans-serif', 'font-decoration': 'none'} }
 		results["data"] = []

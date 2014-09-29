@@ -4,12 +4,12 @@ from snakebite.client import Client
 import pprint
 import urllib, json, ast, zlib, os
 
-hdfs = Client("ip-172-31-17-255")
+hdfs = Client("cloud.soumet.com")
 #for x in hdfs.ls(['/']):
 #	print x
 
 
-hbase = happybase.Connection('localhost')
+hbase = happybase.Connection('cloud.soumet.com')
 hbase_settings_table = hbase.table('settings')
 
 

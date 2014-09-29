@@ -94,52 +94,31 @@ def hyperloglog_save():
 
 
 
-
-# #### block save results
-# known_blocks = None
-# def known_blocks_init():
-# 	global known_blocks
-# 	try:
-# 		print("Loading known blocks from file")
-# 		known_blocks_f = open("known_blocks.dat", "r")
-# 		known_blocks = pickle.load(known_blocks_f)
-# 	except (IOError, EOFError):
-# 		print("Creating Bitarray")
-# 		known_blocks = BitArray(6000000)
-
-# def is_known_block(value):
-# 	return known_blocks[value]
-
-# def mark_block_done(value):
-# 	global known_blocks
-# 	known_blocks[int(value)] = 1
-# def known_blocks_save():
-# 	known_blocks_f = open("known_blocks.dat", "w")
-# 	pickle.dump(known_blocks, known_blocks_f)
-# 	known_blocks_f.close()
-#### block save results
 known_blocks = None
+known_block = None
 def known_blocks_init():
-	global known_blocks
+	global known_blocks, known_block
 	try:
-		print("Loading known blocks from file")
-		known_blocks_f = open("known_blocks_tr.dat", "r")
-		known_blocks = pickle.load(known_blocks_f)
-	except (IOError, EOFError):
-		print("Creating array")
-		known_blocks = 0
+		known_blocks = hbase_settings_table.row('transactions_processed')#, columns=['data'])
+		known_block = int(known_blocks["data:last_block_processed"]) + 1
+		print "Resuming"
+	except:
+		print "No data from Hbase"
+		hbase_settings_table.put('transactions_processed', {'data:last_block_processed' : str(0)})
+		known_block = -1
+	print "Last block processed: " + str(known_block)
 
 def is_known_block(value):
-	return value < known_blocks
-
+	return int(value) < int(known_block)
+	#return value < known_blocks
 def mark_block_done(value):
-	global known_blocks
-	known_blocks = value
+	global known_block
+	known_block = value
+	if int(known_block) % 1000 == 0:
+		known_blocks_save()
 def known_blocks_save():
-	known_blocks_f = open("known_blocks_tr.dat", "w")
-	pickle.dump(known_blocks, known_blocks_f)
-	known_blocks_f.close()
 	kafka_producer.stop()
+	hbase_settings_table.put('transactions_processed', {'data:last_block_processed' : str(known_block)})
 
 
 
@@ -275,9 +254,10 @@ def get_block_json(block_id):
 
 def main():
 	global blockchain_height
+	hbase_init()
+	known_blocks_init()
 	bitcoin_init()
 	kafka_init()
-	hbase_init()
 	
 	blockchain_height = bitcoinrpc.getblockcount()
 	print "Current blockchain height: " + str(blockchain_height)
@@ -299,15 +279,9 @@ def main():
 		sys.exit() 
 	except Exception as e:
 		print(e)
-		#hyperloglog_save()
 		known_blocks_save()
 		sys.exit() 
 
-# bitcoin_init()
-# get_block_json(1056)
-
-
-known_blocks_init()
 main()
 known_blocks_save()
 
@@ -315,23 +289,3 @@ known_blocks_save()
 
 
 
-
-
-
-
-
-
-
-
-#for key, data in import_table.scan():
-#    print key, data
-
-
-
-#if i % 20 == 0:
-				#hbase_connect() #flush every 20
-			#try:
-				#hbase_import_table.put('bitcoinrpc', {'metadata:latest_block_loaded':str(block_id)})
-			#except:
-				#print "Error saving block # " + str(block_id)
-				#break
