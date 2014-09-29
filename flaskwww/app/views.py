@@ -12,6 +12,10 @@ def index():
 	# Renders index.html.
 	return render_template('index.html')
 
+@app.route('/presentation')
+def presentation():
+	return render_template('presentation.html')
+
 @app.route('/history_blocks')
 def history_blocks():
 	return render_template('history_blocks.html')
