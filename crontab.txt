@@ -1,0 +1,13 @@
+
+
+16 * * * * python /home/admin/project/bitcoin/batch_load_blocks.py >> /home/admin/project/bitcoin/blocks.log
+
+05 * * * * python /home/admin/project/bitcoin/bitcoin_realtime.py >> /home/admin/project/bitcoin/realtime.log
+
+*/15 * * * * python /home/admin/project/bitcoin/query_btceUSD.py >> /home/admin/project/bitcoin/exchange.log
+
+*/5 * * * * python /home/admin/project/bitcoin/bitcoin_process_watch.py >> /home/admin/project/bitcoin/client.log
+
+
+*/15 * * * * python /home/admin/project/bitcoin/batch_load_transactions.py >> /home/admin/project/bitcoin/transactions.log
+
