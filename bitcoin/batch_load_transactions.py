@@ -100,21 +100,22 @@ def known_blocks_init():
 	global known_blocks, known_block
 	try:
 		known_blocks = hbase_settings_table.row('transactions_processed')#, columns=['data'])
-		known_block = int(known_blocks["data:last_block_processed"]) + 1
+		known_block = int(known_blocks["data:last_block_processed"])
 		print "Resuming"
 	except:
 		print "No data from Hbase"
-		hbase_settings_table.put('transactions_processed', {'data:last_block_processed' : str(0)})
-		known_block = -1
+		sys.exit(0)
+		#hbase_settings_table.put('transactions_processed', {'data:last_block_processed' : str(0)})
+		#known_block = -1
 	print "Last block processed: " + str(known_block)
 
 def is_known_block(value):
-	return int(value) < int(known_block)
+	return int(value) <= int(known_block)
 	#return value < known_blocks
 def mark_block_done(value):
 	global known_block
 	known_block = value
-	if int(known_block) % 1000 == 0:
+	if int(known_block) % 10 == 0:
 		known_blocks_save()
 def known_blocks_save():
 	kafka_producer.stop()

@@ -2,6 +2,8 @@ from flask import render_template, request, jsonify
 from app import app
 import math
 import mysql.connector
+from cassandra.cluster import Cluster
+from cassandra.query import BatchStatement
 
 import happybase
 
@@ -41,6 +43,10 @@ def api_index():
 def wallets():
 	return render_template('wallets.html')
 
+@app.route('/wallets_timed')
+def wallets_timed():
+	return render_template('wallets_timed.html')
+
 
 
 
@@ -59,14 +65,15 @@ def calculate_granularity(start, end):
 @app.route("/api/<api_id>/")
 @app.route("/api/<api_id>/<value>")
 def api(api_id, value = None):
-	hbase = happybase.Connection('cloud.soumet.com')
 	#app.logger.debug("Call to " + str(api_id) + " with param " + str(value))
 	if api_id == 'getrealtimestats':
+		hbase = happybase.Connection('cloud.soumet.com')
 		hbase_realtime_table = hbase.table('realtime_counters')
 		result = hbase_realtime_table.row("statistics")
 		return jsonify(result)
 
 	elif api_id == 'gethistory':
+		hbase = happybase.Connection('cloud.soumet.com')
 		hbase_blocks_table = hbase.table('block_data')
 		start = request.args.get("start") if request.args.get("start") != None else "0"
 		end = request.args.get("end") if request.args.get("end") != None else "999999999999"
@@ -82,6 +89,7 @@ def api(api_id, value = None):
 
 
 	elif api_id == 'gettransactionhistory':
+		hbase = happybase.Connection('cloud.soumet.com')
 		hbase_blocks_table = hbase.table('block_transactions')
 		start = request.args.get("start") if request.args.get("start") != None else "0"
 		end = request.args.get("end") if request.args.get("end") != None else "999999999999"
@@ -95,6 +103,7 @@ def api(api_id, value = None):
 		return callback + "(" + str(results) + ");"
 
 	elif api_id == 'getpricehistory':
+		hbase = happybase.Connection('cloud.soumet.com')
 		hbase_blocks_table = hbase.table('exchange_transactions')
 		currency = request.args.get("currency")
 		currency = currency if currency != None else "ALL"
@@ -129,6 +138,7 @@ def api(api_id, value = None):
 
 	#wallets.html
 	elif api_id == 'getwalletbuckets':
+		hbase = happybase.Connection('cloud.soumet.com')
 		hbase_wallets_table = hbase.table('wallet_classes')
 		drilldown_level = int(request.args.get("drilldown_level"))
 		start = request.args.get("start") if request.args.get("start") != None else "0"
@@ -159,10 +169,26 @@ def api(api_id, value = None):
 			results["data"].append(newentry)
 		return jsonify(results)
 
+
+	elif api_id == 'getwalletlist_cassandra':
+		# cluster = Cluster(['cassandra1.soumet.com','cassandra2.soumet.com','cassandra3.soumet.com'])
+		# session = cluster.connect('wallets')
+		#start = request.args.get("start")
+		#end = request.args.get("end")
+		results = { "wallets" : []}
+		# if start != None and end != None:
+		# 	rows = session.execute('SELECT address, balance from data \
+		# 		where balance >= %s and balance <= %s limit 1500 ALLOW FILTERING;', (float(start), float(end)))
+		# 	rows = sorted(rows, key=lambda x: x.balance, reverse=True)
+		# 	for row in rows:
+		# 		#print row.address, row.balance
+		# 		results["wallets"].append({"address":str(row.address), "balance":str(row.balance)})
+		return jsonify(results)
+
 	elif api_id == 'getwalletlist':
 		db = mysql.connector.connect(user='bitcoin', password='insightPassword0944$!',host='bitcoin.soumet.com', database='bitcoin')
 		cursor = db.cursor()
-		query = ("SELECT wallet, balance FROM wallets WHERE balance >= %s AND balance < %s order by balance desc LIMIT 1500;")
+		query = ("SELECT wallet, balance FROM wallets WHERE balance >= %s AND balance <= %s order by balance desc LIMIT 1500;")
 		start = request.args.get("start")
 		end = request.args.get("end")
 		results = { "wallets" : []}
@@ -180,6 +206,7 @@ def api(api_id, value = None):
 
 
 	elif api_id == 'getlivetransactions':
+		hbase = happybase.Connection('cloud.soumet.com')
 		hbase_transactions_table = hbase.table('realtime')
 		if value == None:
 			value = "0000000000"

@@ -11,16 +11,18 @@ from kafka import KafkaClient, SimpleProducer
 
 
 #handle kill signal
-import signal
-def signal_handler(signal, frame):
-	known_blocks_save()
-	sys.exit(0)
-signal.signal(signal.SIGINT, signal_handler)
+# import signal
+# def signal_handler(signal, frame):
+# 	known_blocks_save()
+# 	sys.exit(0)
+# signal.signal(signal.SIGINT, signal_handler)
 
 
 
 import socket
 import time
+
+
 def get_lock(process_name):
     global lock_socket
     lock_socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
@@ -30,6 +32,7 @@ def get_lock(process_name):
     except socket.error:
         print 'Process already running. Exiting..'
         sys.exit()
+
 get_lock('bitcoin_batch_load_blocks')
 
 
@@ -72,7 +75,7 @@ kafka_topic = "bitcoin_blocks"
 def kafka_init():
 	global kafka, kafka_producer, kafka_topic
 	kafka = KafkaClient("cloud.soumet.com:9092")
-	kafka_producer = SimpleProducer(kafka,batch_send=True,batch_send_every_n=20,batch_send_every_t=60)
+	kafka_producer = SimpleProducer(kafka)#,batch_send=True,batch_send_every_n=20,batch_send_every_t=60)
 
 
 
@@ -114,24 +117,25 @@ def known_blocks_init():
 	global known_blocks, known_block
 	try:
 		known_blocks = hbase_settings_table.row('blocks_processed')#, columns=['data'])
-		known_block = int(known_blocks["data:last_block_processed"]) + 1
-		print "Resuming"
+		known_block = int(known_blocks["data:last_block_processed"])
+		print "Resuming " + str(known_block)
 	except:
 		print "No data from Hbase"
-		hbase_settings_table.put('blocks_processed', {'data:last_block_processed' : str(0)})
-		known_block = -1
+		sys.exit(1)
+#		hbase_settings_table.put('blocks_processed', {'data:last_block_processed' : str(0)})
+#		known_block = -1
 	print "Last block processed: " + str(known_block)
 
 def is_known_block(value):
-	return int(value) < int(known_block)
+	return int(value) <= int(known_block)
 	#return value < known_blocks
 def mark_block_done(value):
 	global known_block
 	known_block = value
-	if int(known_block) % 1000 == 0:
+	if int(known_block) % 100 == 0:
 		known_blocks_save()
 def known_blocks_save():
-	kafka_producer.stop()
+	#kafka_producer.stop()
 	hbase_settings_table.put('blocks_processed', {'data:last_block_processed' : str(known_block)})
 
 
@@ -219,15 +223,15 @@ def main():
 				print "Loading next block #%s " % str(block_id)  # + "  #" + str(i) + "/" + str(len(difference))
 				get_block_json(block_id)
 				mark_block_done(block_id)
-	except KeyboardInterrupt:
-		known_blocks_save()
-		sys.exit() 
+	#except KeyboardInterrupt:
+	#	known_blocks_save()
+	#	sys.exit() 
 	except Exception as e:
 		print(e)
 		known_blocks_save()
-		sys.exit() 
+		sys.exit()
+	known_blocks_save()
+
 
 
 main()
-known_blocks_save()
-
